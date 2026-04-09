@@ -3,4 +3,4 @@ __pycache__/
 *.log
 operaNightAudit.log
 analysis/
-*.local.bat
+config.py

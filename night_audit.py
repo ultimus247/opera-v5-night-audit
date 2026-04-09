@@ -1,20 +1,32 @@
-from opera_auto import *
-import subprocess, sys
+"""
+OPERA Night Audit - main workflow script
 
-# ============================================================
-# CONFIGURE PER MACHINE
-# ============================================================
-OPERA_URL = "https://win-hqq6fk87f04:4443/OperaLogin/Welcome.do"
-LOG = r"C:\scripts\operaNightAudit.log"
-ALERT_SCRIPT = r"C:\scripts\alertOperaisDown.bat"
-# ============================================================
+All machine-specific settings live in config.py (gitignored).
+To update this script, run `git pull` in C:\\scripts\\.
+"""
+import os
+import sys
+import subprocess
+
+# Load config BEFORE importing opera_auto so ANTHROPIC_API_KEY is available
+try:
+    import config
+except ImportError:
+    print("ERROR: config.py not found. Copy config.example.py to config.py and edit it.")
+    sys.exit(1)
+
+os.environ["ANTHROPIC_API_KEY"] = config.ANTHROPIC_API_KEY
+if getattr(config, "LINEAR_API_KEY", None):
+    os.environ["LINEAR_API_KEY"] = config.LINEAR_API_KEY
+
+from opera_auto import *
 
 
 def audit_log(msg):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     line = f"{ts} {msg}"
     print(line)
-    with open(LOG, "a") as lf:
+    with open(config.LOG_FILE, "a") as lf:
         lf.write(line + "\n")
 
 
@@ -38,7 +50,7 @@ audit_log("=== OPERA Night Audit Started ===")
 
 # Phase 0: Open IE Browser to OPERA
 audit_log("Phase 0: Opening IE Browser")
-subprocess.Popen([r"C:\Program Files\Internet Explorer\iexplore.exe", OPERA_URL])
+subprocess.Popen([config.IE_PATH, config.OPERA_URL])
 time.sleep(4)
 
 opera_loaded = check("Is this the OPERA login screen with username and password fields? If yes no action needed.")
@@ -47,7 +59,7 @@ if not opera_loaded:
     opera_loaded = check("Is this the OPERA login screen with username and password fields? If yes no action needed.")
 if not opera_loaded:
     audit_log("ALERT: OPERA did not load - server may be down")
-    subprocess.Popen([ALERT_SCRIPT])
+    subprocess.Popen([r"C:\scripts\alertOperaisDown.bat"])
     sys.exit(1)
 
 # Phase 1: Login
@@ -133,7 +145,7 @@ for guest_num in range(50):
     time.sleep(3)
     do("Click the Close button at the bottom right of the billing screen to return to the guest list.")
 
-# Phase 8: Monitor Remaining Steps (Roll Date, Posting Room/Tax, Run Additional, Print Final Reports)
+# Phase 8: Monitor Remaining Steps
 audit_log("Phase 8: Monitor Remaining Steps")
 MONITOR = "Look at this OPERA screen. If you see a dialog saying End of Day Routine is now complete with an OK button, click OK. If you see a Print Final Reports screen with ALL reports showing Filed, click Close. If you see the End of Day Routine list still processing, or Print Final Reports with reports Running, do NOT click anything - reply DONE. Otherwise reply DONE."
 wait_and_handle(MONITOR)
@@ -143,7 +155,7 @@ audit_log("Phase 9: Exit End of Day")
 do("Click the Exit button at the bottom of the End of Day Routine screen, next to Start and Setup.")
 time.sleep(5)
 
-# Phase 10: Log off OPERA (handled in wait_and_handle if main menu detected, but click again as backup)
+# Phase 10: Log off OPERA
 audit_log("Phase 10: Log off OPERA")
 do("Click the Log off link on the OPERA main menu. It is in the left panel under Welcome Opera Supervisor.")
 time.sleep(5)

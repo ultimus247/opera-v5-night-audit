@@ -6,78 +6,98 @@ Automated nightly End of Day routine for Oracle OPERA PMS v5 (on-premise) using 
 
 | File | Purpose |
 |------|---------|
+| `config.example.py` | Template for per-machine configuration (copy to `config.py`) |
+| `config.py` | **Your** machine settings (gitignored - never committed) |
 | `opera_auto.py` | Reusable library: screenshot capture, Claude API vision, mouse/keyboard control |
-| `night_audit.py` | Night audit workflow (Phases 0-11) |
-| `analyze_recording.py` | Analyzes OpenAdapt recordings to auto-generate automation scripts |
-| `run_night_audit.bat` | Batch launcher with API key |
-| `alertOperaisDown.bat` | Alert script triggered when OPERA fails to load |
+| `night_audit.py` | 11-phase night audit workflow |
+| `analyze_recording.py` | Analyzes OpenAdapt recordings to bootstrap new automations |
 | `alert_opera_down.py` | Creates urgent Linear ticket on PMS Expert team when OPERA is down |
+| `run_night_audit.bat` | Main launcher |
+| `alertOperaisDown.bat` | Alert launcher (called by night_audit.py on failure) |
+| `install.bat` | One-shot installer (installs Git, clones repo, creates config) |
+| `update.bat` | Pulls latest changes without touching config.py |
 
 ## Deployment to a New Machine
 
-### Prerequisites
-- Windows Server 2019 or later
-- Python 3.14 installed at `C:\Users\Administrator\AppData\Local\Python\pythoncore-3.14-64\`
-- IE configured with OPERA URL as homepage (credentials saved)
-- Anthropic API key
+### Step 1: Download and run install.bat
 
-### Step 1: Install Python packages
+On the target Windows machine, download `install.bat` from this repo:
+
+```cmd
+powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ultimus247/opera-v5-night-audit/main/install.bat' -OutFile '%TEMP%\install.bat'"
+"%TEMP%\install.bat"
+```
+
+The installer will:
+1. Install Git (via winget, or download the Git for Windows installer as fallback)
+2. Clone this repo to `C:\scripts\`
+3. Create `config.py` from the template
+4. Open `config.py` in notepad for you to edit
+
+### Step 2: Install Python dependencies
+
 ```cmd
 pip install openadapt_evals openadapt-ml anthropic Pillow pywin32 mss
 ```
 
-### Step 2: Create scripts directory and clone repo
-```cmd
-mkdir C:\scripts
-cd C:\scripts
-git clone https://github.com/ultimus247/opera-v5-night-audit.git .
-```
+### Step 3: Edit config.py
 
-### Step 3: Configure for this machine
-Edit `night_audit.py` and update the OPERA URL on line ~XX:
+Set these values in `C:\scripts\config.py`:
+
 ```python
-OPERA_URL = "https://win-XXXXXXXX:4443/OperaLogin/Welcome.do"
+ANTHROPIC_API_KEY = "sk-ant-..."                      # Claude API key
+LINEAR_API_KEY = "lin_api_..."                        # Linear API key (for alerts)
+OPERA_URL = "https://win-HOSTNAME:4443/OperaLogin/Welcome.do"  # Per-machine OPERA URL
 ```
 
-Edit `run_night_audit.bat` and set your API key:
-```batch
-set ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Set the Linear API key as a system environment variable (used by the alert script when OPERA is down):
-```cmd
-setx LINEAR_API_KEY "lin_api_..."
-```
-Get a Linear API key from https://linear.app/settings/account/security
+- Claude API key: https://console.anthropic.com/settings/keys
+- Linear API key: https://linear.app/settings/account/security
 
 ### Step 4: Test
+
 ```cmd
 C:\scripts\run_night_audit.bat
 ```
 
-### Step 5: Set up auto-logon (survives reboots)
+### Step 5: Schedule daily runs
+
+Auto-logon (survives reboots):
 ```cmd
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d 1 /f
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName /t REG_SZ /d Administrator /f
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ /d "PASSWORD" /f
 ```
 
-### Step 6: Schedule the task
+Task Scheduler:
 ```cmd
 schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
 ```
 
-### Step 7: Disconnect RDP without logging off
-After verifying everything works, disconnect from RDP using:
+Disconnect RDP without logging off (keeps desktop session alive):
 ```cmd
 tscon %sessionname% /dest:console
 ```
-This keeps the desktop session alive so the scheduled task can run with screen access.
+
+## Updating Scripts
+
+To pull the latest version without losing your `config.py`:
+
+```cmd
+C:\scripts\update.bat
+```
+
+or manually:
+
+```cmd
+cd C:\scripts && git pull
+```
+
+`config.py` is gitignored so your credentials are preserved.
 
 ## How It Works
 
-1. **Phase 0**: Opens IE to OPERA URL, verifies login screen
-2. **Phase 1**: Clicks Login (credentials are pre-filled)
+1. **Phase 0**: Opens IE to OPERA URL from config, verifies login screen (alerts Linear if it fails)
+2. **Phase 1**: Clicks Login (credentials pre-filled by IE)
 3. **Phase 2**: Clicks End of Day button on main menu
 4. **Phase 3**: Clicks Login on End of Day Login dialog
 5. **Phase 4**: Confirms rolling business date (Yes button)
@@ -87,8 +107,17 @@ This keeps the desktop session alive so the scheduled task can run with screen a
    - Click guest → Billing → Payment → Post → No receipt → Check Out → OK → close printer dialogs → Close billing
    - After all guests: Close In House Guest Search → Close Cashier dialogs until Departures has X
 9. **Phase 8**: Monitors remaining steps (Roll Date, Posting Room/Tax, Run Additional, Print Final Reports)
-10. **Phase 9**: Detects return to OPERA main menu, clicks Log off
-11. **Phase 10**: Closes IE
+10. **Phase 9**: Clicks Exit on End of Day Routine
+11. **Phase 10**: Clicks Log off on main menu
+12. **Phase 11**: Closes IE
+
+## Alerting
+
+If OPERA fails to load at Phase 0, the script runs `alertOperaisDown.bat` which calls `alert_opera_down.py` to create an **urgent priority** ticket in Linear on the **PMS Expert** team:
+
+- Title: `URGENT: OPERA is DOWN on <hostname>`
+- Description includes hostname, timestamp, and action items
+- Uses `LINEAR_API_KEY` from `config.py`
 
 ## Cost Estimate
 
@@ -112,8 +141,11 @@ All activity is logged to `C:\scripts\operaNightAudit.log` with timestamps for e
 **Script gets stuck in monitor loop**
 - Phase 8 waits up to 30 checks for End of Day to complete. If your hotel has many reports, increase `max_checks` in `wait_and_handle()`.
 
-**Log shows "OPERA did not load"**
-- IE failed to open or OPERA server is unreachable. Check the URL and network connectivity.
+**"config.py not found" error**
+- Copy `config.example.py` to `config.py` and edit it, or run `install.bat` again.
+
+**Git pull conflicts with config.py**
+- This shouldn't happen since `config.py` is gitignored. If it does, commit your config.py changes locally first.
 
 ## Adding New Automation Tasks
 

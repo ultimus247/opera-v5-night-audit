@@ -2,8 +2,7 @@
 Alert script: Creates an urgent Linear ticket when OPERA server is down.
 Posts to the PMS Expert team.
 
-Requires environment variable: LINEAR_API_KEY
-Get one from: https://linear.app/settings/account/security
+Reads LINEAR_API_KEY and team settings from config.py.
 """
 import os
 import sys
@@ -12,10 +11,14 @@ import json
 import time
 import urllib.request
 
-# PMS Expert team in Linear
-PMS_EXPERT_TEAM_ID = "1c9cf14c-07e8-4c83-b8d7-1f5cce95d540"
+# Load config
+try:
+    import config
+except ImportError:
+    print("ERROR: config.py not found")
+    sys.exit(1)
+
 LINEAR_API_URL = "https://api.linear.app/graphql"
-LOG_FILE = r"C:\scripts\operaNightAudit.log"
 
 
 def log(msg):
@@ -23,19 +26,19 @@ def log(msg):
     line = f"{ts} ALERT: {msg}"
     print(line)
     try:
-        with open(LOG_FILE, "a") as f:
+        with open(config.LOG_FILE, "a") as f:
             f.write(line + "\n")
     except Exception:
         pass
 
 
 def create_linear_ticket():
-    api_key = os.environ.get("LINEAR_API_KEY")
-    if not api_key:
-        log("LINEAR_API_KEY not set - cannot create ticket")
+    api_key = getattr(config, "LINEAR_API_KEY", "") or os.environ.get("LINEAR_API_KEY", "")
+    if not api_key or api_key.startswith("lin_api_YOUR"):
+        log("LINEAR_API_KEY not set in config.py - cannot create ticket")
         return False
 
-    hostname = socket.gethostname()
+    hostname = getattr(config, "HOSTNAME_OVERRIDE", None) or socket.gethostname()
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
     title = f"URGENT: OPERA is DOWN on {hostname}"
@@ -61,10 +64,10 @@ def create_linear_ticket():
     """
     variables = {
         "input": {
-            "teamId": PMS_EXPERT_TEAM_ID,
+            "teamId": config.LINEAR_TEAM_ID,
             "title": title,
             "description": description,
-            "priority": 1,  # 1 = Urgent
+            "priority": config.LINEAR_PRIORITY_URGENT,
         }
     }
 
