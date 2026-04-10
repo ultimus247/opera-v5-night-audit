@@ -12,7 +12,7 @@ REM ============================================================
 
 setlocal
 set REPO_URL=https://github.com/ultimus247/opera-v5-night-audit.git
-set INSTALL_DIR=C:\scripts
+set INSTALL_DIR=C:\scripts\automations
 set PYTHON_WINGET_ID=Python.Python.3.12
 set GIT_WINGET_ID=Git.Git
 
@@ -74,13 +74,23 @@ if %errorlevel% neq 0 (
 )
 
 :refresh_git_path
-set "PATH=%PATH%;C:\Program Files\Git\cmd;C:\Program Files\Git\bin"
+REM Try all common Git install locations
+set "PATH=%PATH%;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;C:\Program Files (x86)\Git\cmd;C:\Program Files (x86)\Git\bin"
+REM Also check if Git installed to user profile
+if exist "%LOCALAPPDATA%\Programs\Git\cmd\git.exe" set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Git\cmd"
+if exist "%ProgramFiles%\Git\cmd\git.exe" echo [OK] Git found at %ProgramFiles%\Git
 where git >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Git installed but not found in PATH.
-    echo Close this window, open a NEW Administrator command prompt, then re-run install.bat
-    pause
-    exit /b 1
+    echo [WARN] Git installed but not found in current PATH.
+    echo Trying to locate it...
+    for /f "delims=" %%i in ('dir /s /b "C:\Program Files\git.exe" 2^>nul') do set "PATH=%PATH%;%%~dpi"
+    for /f "delims=" %%i in ('dir /s /b "C:\Program Files (x86)\git.exe" 2^>nul') do set "PATH=%PATH%;%%~dpi"
+    where git >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [ERROR] Cannot find Git. Close this window, open a NEW command prompt, then re-run install.bat
+        pause
+        exit /b 1
+    )
 )
 echo [OK] Git ready
 
@@ -126,12 +136,23 @@ if %errorlevel% neq 0 (
 :refresh_python_path
 REM Try common Python install locations
 set "PATH=%PATH%;C:\Program Files\Python312;C:\Program Files\Python312\Scripts;C:\Python312;C:\Python312\Scripts"
+set "PATH=%PATH%;C:\Program Files\Python311;C:\Program Files\Python311\Scripts"
+set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Python\Python312;%LOCALAPPDATA%\Programs\Python\Python312\Scripts"
+set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts"
+REM Also check pythoncore (Microsoft Store)
+set "PATH=%PATH%;%LOCALAPPDATA%\Python\pythoncore-3.14-64;%LOCALAPPDATA%\Python\pythoncore-3.14-64\Scripts"
+set "PATH=%PATH%;%LOCALAPPDATA%\Python\pythoncore-3.12-64;%LOCALAPPDATA%\Python\pythoncore-3.12-64\Scripts"
 where python >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Python installed but not found in PATH.
-    echo Close this window, open a NEW Administrator command prompt, then re-run install.bat
-    pause
-    exit /b 1
+    echo [WARN] Python installed but not found in current PATH. Searching...
+    for /f "delims=" %%i in ('dir /s /b "C:\Program Files\python.exe" 2^>nul') do set "PATH=%PATH%;%%~dpi"
+    for /f "delims=" %%i in ('dir /s /b "C:\Python*\python.exe" 2^>nul') do set "PATH=%PATH%;%%~dpi"
+    where python >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [ERROR] Cannot find Python. Close this window, open a NEW command prompt, then re-run install.bat
+        pause
+        exit /b 1
+    )
 )
 echo [OK] Python ready
 python --version

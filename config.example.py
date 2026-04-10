@@ -37,7 +37,7 @@ HOSTNAME_OVERRIDE = None
 # Paths (usually do not need to change)
 # ============================================================
 
-LOG_FILE = r"C:\scripts\operaNightAudit.log"
+LOG_FILE = r"C:\scripts\automations\operaNightAudit.log"
 
 # Python executable - "python" uses PATH (recommended if installed via install.bat)
 # Override with a full path if you have multiple Python versions

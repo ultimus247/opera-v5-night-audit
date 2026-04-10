@@ -42,7 +42,7 @@ The installer will:
 1. **Install Git** (via winget on Server 2019+, or download the Git for Windows installer as fallback)
 2. **Install Python 3.12** (via winget on Server 2019+, or download the Python installer as fallback)
 3. **Install pip dependencies** (`openadapt_evals openadapt-ml anthropic Pillow pywin32 mss`)
-4. **Clone this repo** to `C:\scripts\`
+4. **Clone this repo** to `C:\scripts\automations\`
 5. **Create `config.py`** from the template
 6. **Open `config.py`** in notepad for you to edit
 
@@ -50,7 +50,7 @@ The installer will:
 
 ### Step 2: Edit config.py
 
-Set these values in `C:\scripts\config.py`:
+Set these values in `C:\scripts\automations\config.py`:
 
 ```python
 ANTHROPIC_API_KEY = "sk-ant-..."                      # Claude API key
@@ -64,7 +64,7 @@ OPERA_URL = "https://win-HOSTNAME:4443/OperaLogin/Welcome.do"  # Per-machine OPE
 ### Step 3: Test
 
 ```cmd
-C:\scripts\run_night_audit.bat
+C:\scripts\automations\run_night_audit.bat
 ```
 
 ### Step 4: Schedule daily runs
@@ -78,7 +78,7 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultP
 
 Task Scheduler:
 ```cmd
-schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
+schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\automations\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
 ```
 
 Disconnect RDP without logging off (keeps desktop session alive):
@@ -99,13 +99,13 @@ tscon %sessionname% /dest:console
 To pull the latest version without losing your `config.py`:
 
 ```cmd
-C:\scripts\update.bat
+C:\scripts\automations\update.bat
 ```
 
 or manually:
 
 ```cmd
-cd C:\scripts && git pull
+cd C:\scripts\automations && git pull
 ```
 
 `config.py` is gitignored so your credentials are preserved.

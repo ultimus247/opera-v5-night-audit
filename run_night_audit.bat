@@ -6,7 +6,7 @@ REM All configuration lives in config.py (gitignored).
 REM Copy config.example.py to config.py and edit before running.
 REM ============================================================
 
-cd /d C:\scripts
+cd /d C:\scripts\automations
 
 REM Use python from PATH (set up by install.bat via winget)
-python C:\scripts\night_audit.py
+python C:\scripts\automations\night_audit.py

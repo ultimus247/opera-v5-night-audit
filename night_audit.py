@@ -59,7 +59,7 @@ if not opera_loaded:
     opera_loaded = check("Is this the OPERA login screen with username and password fields? If yes no action needed.")
 if not opera_loaded:
     audit_log("ALERT: OPERA did not load - server may be down")
-    subprocess.Popen([r"C:\scripts\alertOperaisDown.bat"])
+    subprocess.Popen([r"C:\scripts\automations\alertOperaisDown.bat"])
     sys.exit(1)
 
 # Phase 1: Login

@@ -5,7 +5,7 @@ REM
 REM Pulls latest changes from Git without touching config.py.
 REM ============================================================
 
-cd /d C:\scripts
+cd /d C:\scripts\automations
 echo Pulling latest from GitHub...
 git pull
 echo.
