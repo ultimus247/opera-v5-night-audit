@@ -55,9 +55,9 @@ if %HAS_WINGET% equ 1 (
     echo      winget install failed, falling back to manual download...
 )
 
-REM Fallback: download Git for Windows installer via PowerShell
+REM Fallback: download Git for Windows installer via PowerShell (force TLS 1.2 for Server 2012 R2)
 echo      Downloading Git installer...
-powershell -NoProfile -Command "try { Invoke-WebRequest -Uri 'https://github.com/git-for-windows/git/releases/download/v2.43.0.windows.1/Git-2.43.0-64-bit.exe' -OutFile '%TEMP%\git-installer.exe' -UseBasicParsing; exit 0 } catch { exit 1 }"
+powershell -NoProfile -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/git-for-windows/git/releases/download/v2.43.0.windows.1/Git-2.43.0-64-bit.exe' -OutFile '%TEMP%\git-installer.exe' -UseBasicParsing; exit 0 } catch { Write-Host $_.Exception.Message; exit 1 }"
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to download Git installer
     echo Please install Git manually from https://git-scm.com/download/win
@@ -105,9 +105,9 @@ if %HAS_WINGET% equ 1 (
     echo      winget install failed, falling back to manual download...
 )
 
-REM Fallback: download Python installer
+REM Fallback: download Python installer (force TLS 1.2 for Server 2012 R2)
 echo      Downloading Python 3.12 installer...
-powershell -NoProfile -Command "try { Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe' -OutFile '%TEMP%\python-installer.exe' -UseBasicParsing; exit 0 } catch { exit 1 }"
+powershell -NoProfile -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe' -OutFile '%TEMP%\python-installer.exe' -UseBasicParsing; exit 0 } catch { Write-Host $_.Exception.Message; exit 1 }"
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to download Python installer
     echo Please install Python manually from https://www.python.org/downloads/

@@ -19,22 +19,34 @@ Automated nightly End of Day routine for Oracle OPERA PMS v5 (on-premise) using 
 
 ## Deployment to a New Machine
 
-### Step 1: Download and run install.bat as Administrator
+### Step 1: Run the bootstrap installer as Administrator
 
-On the target Windows machine, open an **Administrator** command prompt and run:
+**Option A — PowerShell (works on Server 2012 R2 and later):**
+
+Open PowerShell as Administrator and run:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+iex (iwr https://raw.githubusercontent.com/ultimus247/opera-v5-night-audit/main/bootstrap.ps1 -UseBasicParsing).Content
+```
+
+**Option B — CMD (Server 2019+):**
+
+Open an Administrator command prompt and run:
 
 ```cmd
-powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ultimus247/opera-v5-night-audit/main/install.bat' -OutFile '%TEMP%\install.bat'"
-"%TEMP%\install.bat"
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ultimus247/opera-v5-night-audit/main/install.bat' -OutFile '%TEMP%\install.bat' -UseBasicParsing" && "%TEMP%\install.bat"
 ```
 
 The installer will:
-1. **Install Git** (via winget, or download the Git for Windows installer as fallback)
-2. **Install Python 3.12** (via winget, or download the Python installer as fallback)
+1. **Install Git** (via winget on Server 2019+, or download the Git for Windows installer as fallback)
+2. **Install Python 3.12** (via winget on Server 2019+, or download the Python installer as fallback)
 3. **Install pip dependencies** (`openadapt_evals openadapt-ml anthropic Pillow pywin32 mss`)
 4. **Clone this repo** to `C:\scripts\`
 5. **Create `config.py`** from the template
 6. **Open `config.py`** in notepad for you to edit
+
+> **Server 2012 R2 Note:** winget isn't available on 2012 R2, so the installer will use the manual download fallback for Git and Python. TLS 1.2 is forced in all download commands to work around the old default.
 
 ### Step 2: Edit config.py
 
