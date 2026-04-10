@@ -19,9 +19,9 @@ Automated nightly End of Day routine for Oracle OPERA PMS v5 (on-premise) using 
 
 ## Deployment to a New Machine
 
-### Step 1: Download and run install.bat
+### Step 1: Download and run install.bat as Administrator
 
-On the target Windows machine, download `install.bat` from this repo:
+On the target Windows machine, open an **Administrator** command prompt and run:
 
 ```cmd
 powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ultimus247/opera-v5-night-audit/main/install.bat' -OutFile '%TEMP%\install.bat'"
@@ -29,18 +29,14 @@ powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/u
 ```
 
 The installer will:
-1. Install Git (via winget, or download the Git for Windows installer as fallback)
-2. Clone this repo to `C:\scripts\`
-3. Create `config.py` from the template
-4. Open `config.py` in notepad for you to edit
+1. **Install Git** (via winget, or download the Git for Windows installer as fallback)
+2. **Install Python 3.12** (via winget, or download the Python installer as fallback)
+3. **Install pip dependencies** (`openadapt_evals openadapt-ml anthropic Pillow pywin32 mss`)
+4. **Clone this repo** to `C:\scripts\`
+5. **Create `config.py`** from the template
+6. **Open `config.py`** in notepad for you to edit
 
-### Step 2: Install Python dependencies
-
-```cmd
-pip install openadapt_evals openadapt-ml anthropic Pillow pywin32 mss
-```
-
-### Step 3: Edit config.py
+### Step 2: Edit config.py
 
 Set these values in `C:\scripts\config.py`:
 
@@ -53,13 +49,13 @@ OPERA_URL = "https://win-HOSTNAME:4443/OperaLogin/Welcome.do"  # Per-machine OPE
 - Claude API key: https://console.anthropic.com/settings/keys
 - Linear API key: https://linear.app/settings/account/security
 
-### Step 4: Test
+### Step 3: Test
 
 ```cmd
 C:\scripts\run_night_audit.bat
 ```
 
-### Step 5: Schedule daily runs
+### Step 4: Schedule daily runs
 
 Auto-logon (survives reboots):
 ```cmd
@@ -77,6 +73,14 @@ Disconnect RDP without logging off (keeps desktop session alive):
 ```cmd
 tscon %sessionname% /dest:console
 ```
+
+### Step 5: Prerequisites
+
+- **Windows Server 2019 or later** (winget is built-in on Server 2019+)
+- **Internet Explorer** with OPERA URL set as homepage and credentials saved
+- **Administrator access** to run the installer
+- **Anthropic API key** from https://console.anthropic.com/settings/keys
+- **Linear API key** from https://linear.app/settings/account/security
 
 ## Updating Scripts
 

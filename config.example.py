@@ -38,7 +38,11 @@ HOSTNAME_OVERRIDE = None
 # ============================================================
 
 LOG_FILE = r"C:\scripts\operaNightAudit.log"
-PYTHON_EXE = r"C:\Users\Administrator\AppData\Local\Python\pythoncore-3.14-64\python.exe"
+
+# Python executable - "python" uses PATH (recommended if installed via install.bat)
+# Override with a full path if you have multiple Python versions
+PYTHON_EXE = "python"
+
 IE_PATH = r"C:\Program Files\Internet Explorer\iexplore.exe"
 
 
