@@ -207,14 +207,14 @@ echo Installation complete!
 echo ============================================
 echo.
 echo To update in the future, just run:
-echo    C:\scripts\update.bat
-echo    (or: cd C:\scripts ^&^& git pull)
+echo    C:\scripts\automations\update.bat
+echo    (or: cd C:\scripts\automations ^&^& git pull)
 echo.
 echo To test the night audit:
-echo    C:\scripts\run_night_audit.bat
+echo    C:\scripts\automations\run_night_audit.bat
 echo.
 echo To schedule daily at 2am:
-echo    schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
+echo    schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\automations\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
 echo.
 pause
 endlocal
