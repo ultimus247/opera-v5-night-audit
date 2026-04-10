@@ -77,6 +77,10 @@ audit_log("Phase 3: End of Day Login")
 do_until("Click the Login button on the OPERA End of Day Login dialog.",
          "Is there a dialog asking about moving the business date or the End of Day Routine screen? If yes no action needed.")
 
+# Phase 3b: Handle password expired dialog (if present)
+check("If you see a dialog saying Password has expired with an OK button, click OK. If no such dialog, no action needed.")
+time.sleep(2)
+
 # Phase 4: Confirm Roll Business Date
 audit_log("Phase 4: Confirm Roll Business Date")
 do_until("Click the Yes button to confirm moving the business date.",
