@@ -32,3 +32,19 @@ try {
 
 Write-Host "Running installer..." -ForegroundColor Cyan
 & cmd.exe /c $installerPath
+
+# Refresh PATH from registry so python/git are available in this session
+Write-Host "Refreshing PATH..." -ForegroundColor Cyan
+$machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+$userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$env:PATH = "$machinePath;$userPath"
+
+# Verify
+Write-Host ""
+$gitOk = Get-Command git -ErrorAction SilentlyContinue
+$pyOk = Get-Command python -ErrorAction SilentlyContinue
+if ($gitOk) { Write-Host "[OK] Git: $(git --version)" -ForegroundColor Green } else { Write-Host "[WARN] Git not in PATH - close and reopen PowerShell" -ForegroundColor Yellow }
+if ($pyOk) { Write-Host "[OK] Python: $(python --version)" -ForegroundColor Green } else { Write-Host "[WARN] Python not in PATH - close and reopen PowerShell" -ForegroundColor Yellow }
+
+Write-Host ""
+Write-Host "To test: C:\scripts\automations\run_night_audit.bat" -ForegroundColor Cyan
