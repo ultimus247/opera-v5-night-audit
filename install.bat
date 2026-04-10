@@ -73,6 +73,11 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM Force add Git to system PATH
+echo      Adding Git to system PATH...
+setx PATH "%PATH%;C:\Program Files\Git\cmd" /M >nul 2>&1
+set "PATH=%PATH%;C:\Program Files\Git\cmd"
+
 :refresh_git_path
 REM Try all common Git install locations
 set "PATH=%PATH%;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;C:\Program Files (x86)\Git\cmd;C:\Program Files (x86)\Git\bin"
@@ -132,6 +137,11 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
+
+REM Force add Python to system PATH (PrependPath doesn't always work on Server 2012 R2)
+echo      Adding Python to system PATH...
+setx PATH "%PATH%;C:\Program Files\Python312;C:\Program Files\Python312\Scripts" /M >nul 2>&1
+set "PATH=%PATH%;C:\Program Files\Python312;C:\Program Files\Python312\Scripts"
 
 :refresh_python_path
 REM Try common Python install locations
