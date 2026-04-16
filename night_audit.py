@@ -83,6 +83,7 @@ time.sleep(2)
 
 # Phase 4: Safety check - compare roll-to date with system date, then confirm
 audit_log("Phase 4: Verify roll-to date and confirm")
+business_date = None  # populated from the OPERA confirm dialog; used in final log
 try:
     import base64, re as _re
     from anthropic import Anthropic
@@ -124,6 +125,8 @@ try:
             time.sleep(3)
             subprocess.run("taskkill /F /IM iexplore.exe", shell=True, capture_output=True)
             sys.exit(0)
+        # Safe to proceed - remember this date for the final log
+        business_date = roll_to.strftime("%m-%d-%y")
     else:
         audit_log(f"  Could not parse roll-to date '{roll_to_raw}' - proceeding anyway")
 except Exception as e:
@@ -200,36 +203,11 @@ audit_log("Phase 8: Monitor Remaining Steps")
 MONITOR = "Look at this OPERA screen. If you see a dialog saying End of Day Routine is now complete with an OK button, click OK. If you see a Print Final Reports screen with ALL reports showing Filed, click Close. If you see the End of Day Routine list still processing, or Print Final Reports with reports Running, do NOT click anything - reply DONE. Otherwise reply DONE."
 wait_and_handle(MONITOR, auto_logoff=False)
 
-# Read business date NOW - after End of Day completes so it's the NEW rolled date
-audit_log("Reading business date from completed End of Day Routine...")
-try:
-    import base64
-    from anthropic import Anthropic
-
-    adapter = LocalAdapter()
-    obs = adapter.observe()
-    img = Image.open(io.BytesIO(obs.screenshot))
-    resized = img.resize((1280, 800))
-    buf = io.BytesIO()
-    resized.save(buf, format="PNG")
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
-
-    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    resp = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=50,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
-                {"type": "text", "text": "Look at the OPERA application windows ONLY. Ignore any command prompt, terminal, PowerShell, batch script, Windows clock, or taskbar. Find the business date shown in an OPERA window title bar (format 'End of Day - MM-DD-YY') or in an OPERA dialog box. Reply with ONLY the date in MM-DD-YY format, nothing else. If no OPERA window shows a date, reply UNKNOWN."}
-            ]
-        }]
-    )
-    business_date = resp.content[0].text.strip()
-    audit_log(f"Business Date: {business_date}")
-except Exception as e:
-    audit_log(f"Failed to read business date: {e}")
+# Log the business date we captured from the Phase 4 confirm dialog
+if business_date:
+    audit_log(f"Business Date (rolled to): {business_date}")
+else:
+    audit_log("Business Date: UNKNOWN (could not parse from Phase 4 dialog)")
 
 # Phase 9: Log off OPERA
 audit_log("Phase 9: Log off OPERA")
