@@ -96,24 +96,41 @@ def create_ticket(title, description, priority=None):
         return None
 
 
-def alert_phase_failure(phase_name, reason):
-    """File a ticket when a night audit phase fails to reach its expected state."""
+def alert_night_audit_not_run(phase_name, reason):
+    """Night audit was blocked BEFORE the End of Day routine started.
+    Used for Phases 2-5 where we couldn't reach the confirm/start screens.
+    """
     hostname = get_hostname()
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    title = f"URGENT: Night audit failed at {phase_name} on {hostname}"
+    title = f"URGENT: Night audit did not run on {hostname}"
     description = (
-        f"**Night audit script could not complete {phase_name} on {hostname}**\n\n"
+        f"**Night audit script exited before starting the End of Day routine on {hostname}**\n\n"
         f"- **Hostname:** {hostname}\n"
         f"- **Phase:** {phase_name}\n"
         f"- **Detected at:** {timestamp}\n"
-        f"- **Reason:** {reason}\n"
-        f"- **Source:** Automated night audit script\n\n"
-        f"The script aborted after being unable to reach the expected screen "
-        f"during this phase. OPERA may be in an unexpected state, or the UI may "
-        f"have changed.\n\n"
-        f"**Action required:** Investigate the OPERA state on `{hostname}`, "
-        f"manually complete the night audit if needed, and review the logs at "
-        f"`C:\\scripts\\automations\\operaNightAudit.log` before the next scheduled run."
+        f"- **Reason:** {reason}\n\n"
+        f"**Action required:** Manually run the night audit on `{hostname}` before the next scheduled run. "
+        f"Review `C:\\scripts\\automations\\operaNightAudit.log` for details."
+    )
+    return create_ticket(title, description)
+
+
+def alert_night_audit_failed(phase_name, reason):
+    """Generic failure during the End of Day routine (Phases 6-9).
+    Used when we can't detect an expected screen after Start has been clicked.
+    """
+    hostname = get_hostname()
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    title = f"URGENT: OPERA Night Audit Failed on {hostname}"
+    description = (
+        f"**Night audit script hit an error during the End of Day routine on {hostname}**\n\n"
+        f"- **Hostname:** {hostname}\n"
+        f"- **Phase:** {phase_name}\n"
+        f"- **Detected at:** {timestamp}\n"
+        f"- **Reason:** {reason}\n\n"
+        f"The End of Day routine may be partially complete. "
+        f"Check OPERA directly on `{hostname}` and review "
+        f"`C:\\scripts\\automations\\operaNightAudit.log`."
     )
     return create_ticket(title, description)
 
