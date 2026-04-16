@@ -81,8 +81,54 @@ do_until("Click the Login button on the OPERA End of Day Login dialog.",
 check("If you see a dialog saying Password has expired with an OK button, click OK. If no such dialog, no action needed.")
 time.sleep(2)
 
-# Phase 4: Confirm Roll Business Date
-audit_log("Phase 4: Confirm Roll Business Date")
+# Phase 4: Safety check - compare roll-to date with system date, then confirm
+audit_log("Phase 4: Verify roll-to date and confirm")
+try:
+    import base64, re as _re
+    from anthropic import Anthropic
+    from datetime import datetime
+
+    adapter = LocalAdapter()
+    obs = adapter.observe()
+    img = Image.open(io.BytesIO(obs.screenshot))
+    resized = img.resize((1280, 800))
+    buf = io.BytesIO()
+    resized.save(buf, format="PNG")
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    resp = client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=100,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+                {"type": "text", "text": "Look at the OPERA dialog box asking about moving the business date. It reads like 'Are you sure you want to move the business date from MM-DD-YY to MM-DD-YY?'. Reply with ONLY the TO date (the new date) in MM-DD-YY format, nothing else. Look ONLY at the OPERA dialog - ignore any other windows or command prompts."}
+            ]
+        }]
+    )
+    roll_to_raw = resp.content[0].text.strip()
+    audit_log(f"  Roll-to date from OPERA dialog: {roll_to_raw}")
+
+    # Parse MM-DD-YY and compare to today
+    m = _re.search(r"(\d{2})-(\d{2})-(\d{2})", roll_to_raw)
+    if m:
+        mm, dd, yy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        roll_to = datetime(2000 + yy, mm, dd).date()
+        today = datetime.now().date()
+        audit_log(f"  System date: {today.strftime('%m-%d-%y')}, Roll-to: {roll_to.strftime('%m-%d-%y')}")
+        if roll_to > today:
+            audit_log(f"ABORT: roll-to date {roll_to} is after system date {today} - not rolling forward")
+            do("If you see a dialog asking about moving the business date, click the No button (right side). Do NOT click Yes.")
+            time.sleep(3)
+            subprocess.run("taskkill /F /IM iexplore.exe", shell=True, capture_output=True)
+            sys.exit(0)
+    else:
+        audit_log(f"  Could not parse roll-to date '{roll_to_raw}' - proceeding anyway")
+except Exception as e:
+    audit_log(f"  Date safety check failed: {e} - proceeding anyway")
+
 do_until("Click the Yes button to confirm moving the business date.",
          "Is this the End of Day Routine screen showing the list of steps? If yes no action needed.",
          post_wait=1)
@@ -176,7 +222,7 @@ try:
             "role": "user",
             "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
-                {"type": "text", "text": "Look at this OPERA screen and find the business date. It may be in the title bar of the End of Day Routine window (format 'End of Day - MM-DD-YY') or elsewhere on screen. Reply with ONLY the date in MM-DD-YY format, nothing else. If you cannot see the date, reply UNKNOWN."}
+                {"type": "text", "text": "Look at the OPERA application windows ONLY. Ignore any command prompt, terminal, PowerShell, batch script, Windows clock, or taskbar. Find the business date shown in an OPERA window title bar (format 'End of Day - MM-DD-YY') or in an OPERA dialog box. Reply with ONLY the date in MM-DD-YY format, nothing else. If no OPERA window shows a date, reply UNKNOWN."}
             ]
         }]
     )
