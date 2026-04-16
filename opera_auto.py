@@ -82,16 +82,26 @@ def navigate(button_name):
     do(f"Click the {button_name} button on the OPERA main menu.")
     time.sleep(5)
 
-def wait_and_handle(prompt, max_checks=30, interval=30):
+def wait_and_handle(prompt, max_checks=30, interval=30, auto_logoff=True):
+    """Monitor until End of Day completes.
+
+    Returns True when we detect the OPERA main menu (routine complete).
+    When auto_logoff=True, also clicks Log off before returning.
+    Pass auto_logoff=False to let the caller handle logoff (e.g. to read
+    the business date first).
+    """
     for i in range(max_checks):
         log(f"  Monitor check {i+1}/{max_checks}")
         is_done = check(prompt, wait=0)
         if is_done:
             at_menu = check("Are you on the OPERA main menu showing PMS, End of Day, SFA buttons, with a [Log off] link in the upper left of the window under Welcome Opera Supervisor? If yes no action needed.")
             if at_menu:
-                log("  Back at main menu - clicking Log off")
-                do("Click the [Log off] link in the upper left of the OPERA main menu, located under Welcome Opera Supervisor.")
-                time.sleep(3)
+                if auto_logoff:
+                    log("  Back at main menu - clicking Log off")
+                    do("Click the [Log off] link in the upper left of the OPERA main menu, located under Welcome Opera Supervisor.")
+                    time.sleep(3)
+                else:
+                    log("  Back at main menu - caller will handle logoff")
                 return True
             log("  No action needed, waiting...")
         time.sleep(interval)
