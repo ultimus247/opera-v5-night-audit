@@ -87,6 +87,38 @@ do_until("Click the Yes button to confirm moving the business date.",
          "Is this the End of Day Routine screen showing the list of steps? If yes no action needed.",
          post_wait=1)
 
+# Read business date from End of Day Routine title bar ("End of Day - MM-DD-YY")
+# Doing this early because wait_and_handle in Phase 8 will click Log off once complete.
+audit_log("Reading business date from End of Day Routine title bar...")
+try:
+    import base64
+    from anthropic import Anthropic
+
+    adapter = LocalAdapter()
+    obs = adapter.observe()
+    img = Image.open(io.BytesIO(obs.screenshot))
+    resized = img.resize((1280, 800))
+    buf = io.BytesIO()
+    resized.save(buf, format="PNG")
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    resp = client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=50,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+                {"type": "text", "text": "Look at the title bar of the End of Day Routine window (it reads 'End of Day - MM-DD-YY' or similar). Reply with ONLY the date in MM-DD-YY format. If you cannot see the date, reply UNKNOWN."}
+            ]
+        }]
+    )
+    business_date = resp.content[0].text.strip()
+    audit_log(f"Business Date: {business_date}")
+except Exception as e:
+    audit_log(f"Failed to read business date: {e}")
+
 # Phase 5: Start End of Day Routine
 audit_log("Phase 5: Start End of Day Routine")
 do("Click the Start button at the bottom of the End of Day Routine screen.")
@@ -153,38 +185,6 @@ for guest_num in range(50):
 audit_log("Phase 8: Monitor Remaining Steps")
 MONITOR = "Look at this OPERA screen. If you see a dialog saying End of Day Routine is now complete with an OK button, click OK. If you see a Print Final Reports screen with ALL reports showing Filed, click Close. If you see the End of Day Routine list still processing, or Print Final Reports with reports Running, do NOT click anything - reply DONE. Otherwise reply DONE."
 wait_and_handle(MONITOR)
-
-# Read business date BEFORE closing anything - End of Day Routine screen shows it in title bar
-# Use the Anthropic client directly (ApiAgent is for action responses and fails on plain text)
-audit_log("Reading business date from End of Day Routine screen...")
-try:
-    import base64
-    from anthropic import Anthropic
-
-    adapter = LocalAdapter()
-    obs = adapter.observe()
-    img = Image.open(io.BytesIO(obs.screenshot))
-    resized = img.resize((1280, 800))
-    buf = io.BytesIO()
-    resized.save(buf, format="PNG")
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
-
-    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    resp = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=50,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
-                {"type": "text", "text": "Look at the title bar of the End of Day Routine window. It shows the business date in the format 'End of Day - MM-DD-YY'. Reply ONLY with the date in MM-DD-YY format, nothing else."}
-            ]
-        }]
-    )
-    business_date = resp.content[0].text.strip()
-    audit_log(f"Business Date: {business_date}")
-except Exception as e:
-    audit_log(f"Failed to read business date: {e}")
 
 # Phase 9: Exit End of Day
 audit_log("Phase 9: Exit End of Day")
