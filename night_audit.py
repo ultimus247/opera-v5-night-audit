@@ -181,23 +181,13 @@ for guest_num in range(50):
     time.sleep(3)
     do("Click the Close button at the bottom right of the billing screen to return to the guest list.")
 
-# Phase 8: Monitor Remaining Steps
+# Phase 8: Monitor Remaining Steps (also handles Exit + Log off when back at main menu)
 audit_log("Phase 8: Monitor Remaining Steps")
 MONITOR = "Look at this OPERA screen. If you see a dialog saying End of Day Routine is now complete with an OK button, click OK. If you see a Print Final Reports screen with ALL reports showing Filed, click Close. If you see the End of Day Routine list still processing, or Print Final Reports with reports Running, do NOT click anything - reply DONE. Otherwise reply DONE."
 wait_and_handle(MONITOR)
 
-# Phase 9: Exit End of Day
-audit_log("Phase 9: Exit End of Day")
-do("Click the Exit button at the bottom of the End of Day Routine screen, next to Start and Setup.")
-time.sleep(5)
-
-# Phase 10: Log off OPERA
-audit_log("Phase 10: Log off OPERA")
-do("Click the Log off link on the OPERA main menu. It is in the left panel under Welcome Opera Supervisor.")
-time.sleep(5)
-
-# Phase 11: Close IE
-audit_log("Phase 11: Close IE")
+# Phase 9: Close IE
+audit_log("Phase 9: Close IE")
 subprocess.run("taskkill /F /IM iexplore.exe", shell=True, capture_output=True)
 time.sleep(2)
 
