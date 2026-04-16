@@ -110,6 +110,23 @@ cd C:\scripts\automations && git pull
 
 `config.py` is gitignored so your credentials are preserved.
 
+### Auto-update (recommended)
+
+Schedule a daily `git pull` at 11:30pm — 30 minutes before the night audit runs. This keeps every machine on the latest version without manual intervention.
+
+```cmd
+C:\scripts\automations\schedule_autoupdate.bat
+```
+
+This creates a scheduled task `"OPERA Auto-Update"` that runs `update.bat` daily. Updates are logged to `C:\scripts\automations\update.log`.
+
+To change the update time or remove:
+
+```cmd
+schtasks /query /tn "OPERA Auto-Update"
+schtasks /delete /tn "OPERA Auto-Update" /f
+```
+
 ## How It Works
 
 1. **Phase 0**: Opens IE to OPERA URL from config, verifies login screen (alerts Linear if it fails)
