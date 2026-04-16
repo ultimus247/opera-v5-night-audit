@@ -155,25 +155,33 @@ MONITOR = "Look at this OPERA screen. If you see a dialog saying End of Day Rout
 wait_and_handle(MONITOR)
 
 # Read business date BEFORE closing anything - End of Day Routine screen shows it in title bar
+# Use the Anthropic client directly (ApiAgent is for action responses and fails on plain text)
 audit_log("Reading business date from End of Day Routine screen...")
 try:
+    import base64
+    from anthropic import Anthropic
+
     adapter = LocalAdapter()
     obs = adapter.observe()
     img = Image.open(io.BytesIO(obs.screenshot))
     resized = img.resize((1280, 800))
     buf = io.BytesIO()
     resized.save(buf, format="PNG")
-    new_obs = BenchmarkObservation(screenshot=buf.getvalue(), viewport=(1280, 800))
-    agent = ApiAgent(provider="anthropic")
-    task = BenchmarkTask(
-        task_id="read",
-        instruction="Look at the title bar of the End of Day Routine window. It shows the business date in the format 'End of Day - MM-DD-YY'. What is the business date? Reply ONLY with the date in MM-DD-YY format, nothing else. Do NOT click anything.",
-        domain="opera",
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    resp = client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=50,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+                {"type": "text", "text": "Look at the title bar of the End of Day Routine window. It shows the business date in the format 'End of Day - MM-DD-YY'. Reply ONLY with the date in MM-DD-YY format, nothing else."}
+            ]
+        }]
     )
-    action = agent.act(new_obs, task)
-    # The date is usually in the raw_action.code or the response text
-    raw = action.raw_action or {}
-    business_date = raw.get("code", "") or raw.get("response", "") or str(raw)
+    business_date = resp.content[0].text.strip()
     audit_log(f"Business Date: {business_date}")
 except Exception as e:
     audit_log(f"Failed to read business date: {e}")
