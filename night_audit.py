@@ -154,6 +154,30 @@ audit_log("Phase 8: Monitor Remaining Steps")
 MONITOR = "Look at this OPERA screen. If you see a dialog saying End of Day Routine is now complete with an OK button, click OK. If you see a Print Final Reports screen with ALL reports showing Filed, click Close. If you see the End of Day Routine list still processing, or Print Final Reports with reports Running, do NOT click anything - reply DONE. Otherwise reply DONE."
 wait_and_handle(MONITOR)
 
+# Read business date BEFORE closing anything - End of Day Routine screen shows it in title bar
+audit_log("Reading business date from End of Day Routine screen...")
+try:
+    adapter = LocalAdapter()
+    obs = adapter.observe()
+    img = Image.open(io.BytesIO(obs.screenshot))
+    resized = img.resize((1280, 800))
+    buf = io.BytesIO()
+    resized.save(buf, format="PNG")
+    new_obs = BenchmarkObservation(screenshot=buf.getvalue(), viewport=(1280, 800))
+    agent = ApiAgent(provider="anthropic")
+    task = BenchmarkTask(
+        task_id="read",
+        instruction="Look at the title bar of the End of Day Routine window. It shows the business date in the format 'End of Day - MM-DD-YY'. What is the business date? Reply ONLY with the date in MM-DD-YY format, nothing else. Do NOT click anything.",
+        domain="opera",
+    )
+    action = agent.act(new_obs, task)
+    # The date is usually in the raw_action.code or the response text
+    raw = action.raw_action or {}
+    business_date = raw.get("code", "") or raw.get("response", "") or str(raw)
+    audit_log(f"Business Date: {business_date}")
+except Exception as e:
+    audit_log(f"Failed to read business date: {e}")
+
 # Phase 9: Exit End of Day
 audit_log("Phase 9: Exit End of Day")
 do("Click the Exit button at the bottom of the End of Day Routine screen, next to Start and Setup.")
@@ -169,20 +193,4 @@ audit_log("Phase 11: Close IE")
 subprocess.run("taskkill /F /IM iexplore.exe", shell=True, capture_output=True)
 time.sleep(2)
 
-# Read business date for log
-audit_log("Reading business date from final screen...")
-adapter = LocalAdapter()
-obs = adapter.observe()
-img = Image.open(io.BytesIO(obs.screenshot))
-resized = img.resize((1280, 800))
-buf = io.BytesIO()
-resized.save(buf, format="PNG")
-new_obs = BenchmarkObservation(screenshot=buf.getvalue(), viewport=(1280, 800))
-agent = ApiAgent(provider="anthropic")
-task = BenchmarkTask(task_id="read",
-                     instruction="What is the Business Date shown on this screen? Reply ONLY with the date, nothing else. Do NOT click anything.",
-                     domain="opera")
-action = agent.act(new_obs, task)
-raw = (action.raw_action or {}).get("code", str(action.raw_action))
-audit_log(f"Business Date from screen: {raw}")
 audit_log("=== OPERA Night Audit Complete ===")
