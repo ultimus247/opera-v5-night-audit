@@ -129,72 +129,115 @@ if still_expired:
                   "Password expired dialog is still visible after OK click - SUPERVISOR password must be changed manually")
 
 # Phase 4: Read the roll-to date from the confirm dialog, compare against system date, then Yes
+# The dialog may take a moment to appear after Phase 3 Login, so we retry up to 3 times.
+# It may also have been auto-dismissed already (we see the EOD Routine screen instead).
 audit_log("Phase 4: Verify roll-to date and confirm")
 business_date = None  # populated from the OPERA confirm dialog; used in final log
-try:
-    import base64, re as _re
-    from anthropic import Anthropic
-    from datetime import datetime, timedelta
+import base64, re as _re
+from anthropic import Anthropic
+from datetime import datetime, timedelta
 
-    adapter = LocalAdapter()
-    obs = adapter.observe()
-    img = Image.open(io.BytesIO(obs.screenshot))
-    resized = img.resize((1280, 800))
-    buf = io.BytesIO()
-    resized.save(buf, format="PNG")
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
+dates_captured = False
+for date_attempt in range(3):
+    try:
+        time.sleep(3)  # give dialog time to appear
+        adapter = LocalAdapter()
+        obs = adapter.observe()
+        img = Image.open(io.BytesIO(obs.screenshot))
+        resized = img.resize((1280, 800))
+        buf = io.BytesIO()
+        resized.save(buf, format="PNG")
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
 
-    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    resp = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=100,
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
-                {"type": "text", "text": "Look at the OPERA dialog box asking about moving the business date. It reads like 'Are you sure you want to move the business date from MM-DD-YY to MM-DD-YY?'. Reply with ONLY the FROM date and TO date separated by a space in MM-DD-YY format. Example: '04-15-26 04-16-26'. Look ONLY at the OPERA dialog - ignore other windows."}
-            ]
-        }]
-    )
-    dates_raw = resp.content[0].text.strip()
-    audit_log(f"  Dates from OPERA dialog: {dates_raw}")
+        client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=150,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+                    {"type": "text", "text": "Look at this OPERA screen. Answer with ONE of these:\n1. If you see a dialog asking 'Are you sure you want to move the business date from MM-DD-YY to MM-DD-YY?', reply with ONLY the two dates in MM-DD-YY format separated by a space. Example: '04-15-26 04-16-26'\n2. If you see the End of Day Routine screen (list of steps like Country and State Check, Departures, etc.), reply ROUTINE\n3. If you see the End of Day Login screen, reply LOGIN\nLook ONLY at OPERA windows - ignore command prompts, taskbars, or other windows."}
+                ]
+            }]
+        )
+        screen_response = resp.content[0].text.strip()
+        audit_log(f"  Phase 4 attempt {date_attempt+1}: {screen_response}")
 
-    dates = _re.findall(r"(\d{2})-(\d{2})-(\d{2})", dates_raw)
-    if len(dates) >= 2:
-        from_parts, to_parts = dates[0], dates[1]
-        roll_from = datetime(2000 + int(from_parts[2]), int(from_parts[0]), int(from_parts[1])).date()
-        roll_to = datetime(2000 + int(to_parts[2]), int(to_parts[0]), int(to_parts[1])).date()
-        today = datetime.now().date()
-        audit_log(f"  System date: {today.strftime('%m-%d-%y')}, From: {roll_from.strftime('%m-%d-%y')}, To: {roll_to.strftime('%m-%d-%y')}")
+        # Case 1: We see the roll date confirmation dialog with both dates
+        dates = _re.findall(r"(\d{2})-(\d{2})-(\d{2})", screen_response)
+        if len(dates) >= 2:
+            from_parts, to_parts = dates[0], dates[1]
+            roll_from = datetime(2000 + int(from_parts[2]), int(from_parts[0]), int(from_parts[1])).date()
+            roll_to = datetime(2000 + int(to_parts[2]), int(to_parts[0]), int(to_parts[1])).date()
+            today = datetime.now().date()
+            audit_log(f"  System date: {today.strftime('%m-%d-%y')}, From: {roll_from.strftime('%m-%d-%y')}, To: {roll_to.strftime('%m-%d-%y')}")
 
-        if roll_from >= today:
-            reason = (f"OPERA business date ({roll_from.strftime('%m-%d-%y')}) is already "
-                      f"equal to or ahead of the system date ({today.strftime('%m-%d-%y')}). "
-                      f"Night audit appears to have already run today - refusing to roll forward.")
-            do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
-            time.sleep(3)
-            fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
+            if roll_from >= today:
+                reason = (f"OPERA business date ({roll_from.strftime('%m-%d-%y')}) is already "
+                          f"equal to or ahead of the system date ({today.strftime('%m-%d-%y')}). "
+                          f"Night audit appears to have already run today - refusing to roll forward.")
+                do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
+                time.sleep(3)
+                fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
 
-        if roll_to > today:
-            reason = (f"Roll-to date ({roll_to.strftime('%m-%d-%y')}) is after the system date "
-                      f"({today.strftime('%m-%d-%y')}). Refusing to roll past real calendar time.")
-            do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
-            time.sleep(3)
-            fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
+            if roll_to > today:
+                reason = (f"Roll-to date ({roll_to.strftime('%m-%d-%y')}) is after the system date "
+                          f"({today.strftime('%m-%d-%y')}). Refusing to roll past real calendar time.")
+                do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
+                time.sleep(3)
+                fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
 
-        business_date = roll_to.strftime("%m-%d-%y")
-    else:
-        audit_log(f"  Could not parse from/to dates from '{dates_raw}' - proceeding without safety check")
-except SystemExit:
-    raise
-except Exception as e:
-    audit_log(f"  Date safety check errored: {e} - proceeding anyway")
+            business_date = roll_to.strftime("%m-%d-%y")
+            dates_captured = True
+            break
 
-if not do_until("Click the Yes button to confirm moving the business date.",
+        # Case 2: Already at EOD Routine screen (dialog was auto-dismissed)
+        if "ROUTINE" in screen_response.upper():
+            audit_log("  Already at End of Day Routine screen - roll dialog was auto-handled")
+            # Try to get the date from the title bar ("End of Day - MM-DD-YY")
+            resp2 = client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=50,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+                        {"type": "text", "text": "Look at the title bar of the End of Day Routine window. It shows a date like 'End of Day - MM-DD-YY'. Reply with ONLY the date in MM-DD-YY format. Ignore other windows."}
+                    ]
+                }]
+            )
+            title_date = resp2.content[0].text.strip()
+            title_dates = _re.findall(r"(\d{2})-(\d{2})-(\d{2})", title_date)
+            if title_dates:
+                parts = title_dates[0]
+                business_date = f"{parts[0]}-{parts[1]}-{parts[2]}"
+                audit_log(f"  Business date from title bar: {business_date}")
+            dates_captured = True
+            break
+
+        # Case 3: Still on Login screen - dialog hasn't appeared yet, retry
+        if "LOGIN" in screen_response.upper():
+            audit_log(f"  Still on Login screen, waiting for roll dialog (attempt {date_attempt+1}/3)...")
+            continue
+
+        # Unknown response - retry
+        audit_log(f"  Unexpected screen state, retrying...")
+
+    except SystemExit:
+        raise
+    except Exception as e:
+        audit_log(f"  Date check attempt {date_attempt+1} errored: {e}")
+
+if not dates_captured:
+    audit_log("  Could not capture dates after 3 attempts - proceeding without safety check")
+
+# Click Yes on the roll dialog (if still visible) and verify we reach the EOD Routine screen
+if not do_until("Click the Yes button to confirm moving the business date. If you see the End of Day Routine screen already, no action needed.",
                 "Is this the End of Day Routine screen showing the list of steps? If yes no action needed.",
                 post_wait=1):
     fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date",
-                  "Clicked Yes on the roll dialog but End of Day Routine screen never appeared")
+                  "Could not reach the End of Day Routine screen after confirming the roll")
 
 # Phase 5: Start End of Day Routine - must verify it actually began
 audit_log("Phase 5: Start End of Day Routine")
