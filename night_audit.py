@@ -211,8 +211,12 @@ for date_attempt in range(3):
             title_dates = _re.findall(r"(\d{2})-(\d{2})-(\d{2})", title_date)
             if title_dates:
                 parts = title_dates[0]
-                business_date = f"{parts[0]}-{parts[1]}-{parts[2]}"
-                audit_log(f"  Business date from title bar: {business_date}")
+                # The title bar shows the date being audited (FROM date),
+                # not the date we're rolling to. Add 1 day for the TO date.
+                title_from = datetime(2000 + int(parts[2]), int(parts[0]), int(parts[1])).date()
+                title_to = title_from + timedelta(days=1)
+                business_date = title_to.strftime("%m-%d-%y")
+                audit_log(f"  Title bar shows {title_from.strftime('%m-%d-%y')} (FROM); rolling to {business_date} (TO)")
             dates_captured = True
             break
 
