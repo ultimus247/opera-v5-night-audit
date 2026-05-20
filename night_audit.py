@@ -38,6 +38,49 @@ def audit_log(msg):
         lf.write(line + "\n")
 
 
+# Log retention: keep this many days of history in operaNightAudit.log.
+# Older entries are trimmed at the start of every run.
+LOG_RETENTION_DAYS = getattr(config, "LOG_RETENTION_DAYS", 7)
+
+
+def rotate_log(log_path, keep_days):
+    """Trim a log file in-place to keep only entries from the last `keep_days`.
+    Log entries are expected to start with a 'YYYY-MM-DD HH:MM:SS' timestamp.
+    Best-effort: any errors are swallowed so a corrupt log can't block the audit.
+    """
+    from datetime import datetime, timedelta
+    if not os.path.exists(log_path):
+        return
+    try:
+        cutoff = (datetime.now() - timedelta(days=keep_days)).strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_path, "r") as f:
+            lines = f.readlines()
+        # Find first line whose leading timestamp is >= cutoff.
+        # YYYY-MM-DD HH:MM:SS sorts lexicographically, so string compare works.
+        keep_from = None
+        for i, line in enumerate(lines):
+            ts = line[:19]
+            # Only consider lines that look like a valid timestamp
+            if len(ts) == 19 and ts[4] == "-" and ts[10] == " " and ts >= cutoff:
+                keep_from = i
+                break
+        if keep_from is None:
+            # All entries are older than cutoff - clear the file entirely
+            keep_from = len(lines)
+        if keep_from > 0:
+            removed = keep_from
+            with open(log_path, "w") as f:
+                f.writelines(lines[keep_from:])
+                f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} === Log rotated: removed {removed} entries older than {keep_days} days ===\n")
+    except Exception:
+        # Don't let log rotation block the audit
+        pass
+
+
+# Rotate the log file before writing anything new this run
+rotate_log(config.LOG_FILE, LOG_RETENTION_DAYS)
+
+
 def do_until(instruction, verify, retries=3, post_wait=0):
     for attempt in range(retries):
         log(f"  Attempt {attempt+1}/{retries}")

@@ -39,6 +39,10 @@ HOSTNAME_OVERRIDE = None
 
 LOG_FILE = r"C:\scripts\automations\operaNightAudit.log"
 
+# Days of log history to retain. Older entries are trimmed at the start of
+# each night audit run. Default is 7 days.
+LOG_RETENTION_DAYS = 7
+
 # Python executable - "python" uses PATH (recommended if installed via install.bat)
 # Override with a full path if you have multiple Python versions
 PYTHON_EXE = "python"
