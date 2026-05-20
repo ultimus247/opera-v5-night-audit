@@ -40,7 +40,8 @@ def get_hostname():
 
 
 def create_ticket(title, description, priority=None):
-    """Create a Linear ticket on the PMS Expert team.
+    """Create a Linear ticket on the configured team and assign to the
+    configured user (defaults to David Thomson, PMS Gateway team).
 
     Returns the created issue dict on success, or None on failure.
     """
@@ -60,14 +61,16 @@ def create_ticket(title, description, priority=None):
         }
     }
     """
-    variables = {
-        "input": {
-            "teamId": config.LINEAR_TEAM_ID,
-            "title": title,
-            "description": description,
-            "priority": priority,
-        }
+    issue_input = {
+        "teamId": config.LINEAR_TEAM_ID,
+        "title": title,
+        "description": description,
+        "priority": priority,
     }
+    assignee_id = getattr(config, "LINEAR_ASSIGNEE_ID", None)
+    if assignee_id:
+        issue_input["assigneeId"] = assignee_id
+    variables = {"input": issue_input}
 
     payload = json.dumps({"query": mutation, "variables": variables}).encode()
     req = urllib.request.Request(

@@ -54,6 +54,15 @@ IE_PATH = r"C:\Program Files\Internet Explorer\iexplore.exe"
 # Linear Settings (defaults OK)
 # ============================================================
 
-# PMS Expert team in Linear
-LINEAR_TEAM_ID = "1c9cf14c-07e8-4c83-b8d7-1f5cce95d540"
+# Team the ticket gets filed under. Defaults to PMS Gateway since PMS Expert
+# was retired. Other PMS-related teams:
+#   PMS Gateway:  515cee73-1094-4fff-8381-d7eb7cb27f13
+#   PMS Platform: 5eaff536-f26e-4c52-95e7-bcf6add5c179
+#   PMS Product:  3b6017c5-8e28-4d9f-ae0d-e7d5f6fa97fc
+#   PMS Support:  cdcd1866-632f-4ba2-8c3d-0c0907b28cd8
+LINEAR_TEAM_ID = "515cee73-1094-4fff-8381-d7eb7cb27f13"
+
+# User the ticket is assigned to. Default is David Thomson.
+LINEAR_ASSIGNEE_ID = "8ee07a71-a684-4c25-846b-0c0df6690892"
+
 LINEAR_PRIORITY_URGENT = 1
