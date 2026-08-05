@@ -81,6 +81,8 @@ Task Scheduler:
 schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\automations\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
 ```
 
+The `/it` here is **required and intentional** — see [Scheduled tasks: logged-on vs not](#scheduled-tasks-logged-on-vs-not).
+
 Disconnect RDP without logging off (keeps desktop session alive):
 ```cmd
 tscon %sessionname% /dest:console
@@ -125,6 +127,33 @@ To change the update time or remove:
 ```cmd
 schtasks /query /tn "OPERA Auto-Update"
 schtasks /delete /tn "OPERA Auto-Update" /f
+```
+
+### Scheduled tasks: logged-on vs not
+
+The two tasks have **opposite** requirements. Getting this backwards fails silently.
+
+| Task | Runs | Why |
+|------|------|-----|
+| `OPERA Night Audit` | **Only when user is logged on** (`/it`) | Drives the OPERA GUI with screenshots and mouse control. Needs a live desktop session. Without `/it` it runs in a non-interactive session where screen capture returns black and clicks go nowhere. |
+| `OPERA Auto-Update` | **Whether user is logged on or not** (no `/it`, `/rp` password stored) | Only runs `git pull` + `patch_config.py`. No GUI. Must survive a logged-off machine. |
+
+`/it` ("interactive token") means the task is **silently skipped** when the user is not logged on — no error, no log entry. This is what stopped `OPERA Auto-Update` from pulling for ~2.5 months, so the `LINEAR_ASSIGNEE_ID` fix from 2026-05-20 never reached the machines and alerts kept landing unassigned in team triage.
+
+Because the night audit needs a live session, leave the machine logged on and disconnect RDP with `disconnect.bat` (`tscon`) instead of signing out. Pair that with the auto-logon registry keys above so the session comes back after a reboot.
+
+Verify both tasks:
+
+```cmd
+schtasks /query /tn "OPERA Night Audit" /v /fo list | findstr /i "Logon Mode Status Next Last"
+schtasks /query /tn "OPERA Auto-Update" /v /fo list | findstr /i "Logon Mode Status Next Last"
+```
+
+`Logon Mode` should read `Interactive only` for the night audit and `Interactive/Background` for auto-update. Confirm the update actually landed with:
+
+```cmd
+type C:\scripts\automations\update.log
+python C:\scripts\automations\verify_linear.py
 ```
 
 ## How It Works

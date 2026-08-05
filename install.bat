@@ -226,5 +226,16 @@ echo.
 echo To schedule daily at 2am:
 echo    schtasks /create /tn "OPERA Night Audit" /tr "C:\scripts\automations\run_night_audit.bat" /sc daily /st 02:00 /ru Administrator /rp * /rl highest /it
 echo.
+echo    The /it flag is REQUIRED for the night audit - it drives the OPERA GUI
+echo    and needs a live desktop session. Leave the machine logged on and use
+echo    disconnect.bat to drop RDP instead of signing out.
+echo.
+echo IMPORTANT - also schedule auto-update, or this machine will never
+echo pull fixes and will silently drift out of date:
+echo    C:\scripts\automations\schedule_autoupdate.bat
+echo.
+echo    That task must NOT use /it - it has no GUI and needs to run whether
+echo    the user is logged on or not. schedule_autoupdate.bat handles this.
+echo.
 pause
 endlocal
