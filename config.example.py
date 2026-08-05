@@ -65,4 +65,10 @@ LINEAR_TEAM_ID = "515cee73-1094-4fff-8381-d7eb7cb27f13"
 # User the ticket is assigned to. Default is David Thomson.
 LINEAR_ASSIGNEE_ID = "8ee07a71-a684-4c25-846b-0c0df6690892"
 
+# Workflow state the ticket opens in. Setting this bypasses Linear triage,
+# so these self-remediated automation alerts never hit the shared PMS Gateway
+# triage queue. Default is "In Progress" on the PMS Gateway team.
+# Set to None to fall back to the team's default intake state (triage).
+LINEAR_STATE_ID = "4f502e78-f39f-4d49-8143-adef7de23e9c"
+
 LINEAR_PRIORITY_URGENT = 1

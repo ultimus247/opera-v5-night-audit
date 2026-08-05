@@ -79,10 +79,40 @@ def main():
         print()
     else:
         print("3. No LINEAR_ASSIGNEE_ID configured (tickets will be unassigned)")
+        print("   -> config.py on this machine is STALE. Run update.bat to self-heal.")
         print()
 
-    # 4. List PMS-related teams visible to this key
-    print("4. PMS-related teams visible to this API key:")
+    # 4. Configured workflow state (bypasses triage)
+    state_id = getattr(config, "LINEAR_STATE_ID", None)
+    if state_id:
+        print(f"4. Checking configured LINEAR_STATE_ID ({state_id})...")
+        r = gql(
+            f'{{ workflowState(id: "{state_id}") '
+            f'{{ id name type team {{ id key name }} }} }}'
+        )
+        s = r.get("data", {}).get("workflowState")
+        if s:
+            print(f"   FOUND: \"{s['name']}\" (type: {s['type']}) "
+                  f"on team {s['team']['key']} - {s['team']['name']}")
+            if s["team"]["id"] != team_id:
+                print("   WARNING: this state belongs to a DIFFERENT team than "
+                      "LINEAR_TEAM_ID. Linear will reject the mutation.")
+            else:
+                print("   Tickets will open directly in this state, bypassing triage.")
+        else:
+            print("   NOT FOUND - this workflow state does not exist in this workspace")
+            if r.get("errors"):
+                print(f"   Linear errors: {r['errors']}")
+        print()
+    else:
+        print("4. No LINEAR_STATE_ID configured")
+        print("   -> tickets land in the team's default intake state (TRIAGE),")
+        print("      visible to the whole PMS Gateway team.")
+        print("   -> config.py on this machine is STALE. Run update.bat to self-heal.")
+        print()
+
+    # 5. List PMS-related teams visible to this key
+    print("5. PMS-related teams visible to this API key:")
     r = gql("{ teams(first: 100) { nodes { id key name archivedAt } } }")
     nodes = r.get("data", {}).get("teams", {}).get("nodes", []) or []
     pms = [t for t in nodes if "PMS" in (t.get("key") or "") or "pms" in (t.get("name") or "").lower()]

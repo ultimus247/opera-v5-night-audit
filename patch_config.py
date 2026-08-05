@@ -37,6 +37,10 @@ REQUIRED_KEYS = {
         "7",
         "Days of log history to retain in operaNightAudit.log",
     ),
+    "LINEAR_STATE_ID": (
+        '"4f502e78-f39f-4d49-8143-adef7de23e9c"',  # In Progress, PMS Gateway
+        "Open night audit tickets directly In Progress so they bypass PMS Gateway triage",
+    ),
 }
 
 

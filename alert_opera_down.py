@@ -40,8 +40,13 @@ def get_hostname():
 
 
 def create_ticket(title, description, priority=None):
-    """Create a Linear ticket on the configured team and assign to the
-    configured user (defaults to David Thomson, PMS Gateway team).
+    """Create a Linear ticket on the configured team, assigned to the
+    configured user and opened directly in the configured workflow state
+    (defaults to David Thomson, PMS Gateway team, In Progress).
+
+    Supplying stateId at creation time bypasses Linear triage, so these
+    self-remediated automation alerts never land in the shared PMS Gateway
+    triage queue where the rest of the team sees them.
 
     Returns the created issue dict on success, or None on failure.
     """
@@ -57,7 +62,11 @@ def create_ticket(title, description, priority=None):
     mutation IssueCreate($input: IssueCreateInput!) {
         issueCreate(input: $input) {
             success
-            issue { id identifier url }
+            issue {
+                id identifier url
+                state { name }
+                assignee { name }
+            }
         }
     }
     """
@@ -70,6 +79,9 @@ def create_ticket(title, description, priority=None):
     assignee_id = getattr(config, "LINEAR_ASSIGNEE_ID", None)
     if assignee_id:
         issue_input["assigneeId"] = assignee_id
+    state_id = getattr(config, "LINEAR_STATE_ID", None)
+    if state_id:
+        issue_input["stateId"] = state_id
     variables = {"input": issue_input}
 
     payload = json.dumps({"query": mutation, "variables": variables}).encode()
@@ -90,7 +102,12 @@ def create_ticket(title, description, priority=None):
                 return None
             issue = data.get("data", {}).get("issueCreate", {}).get("issue", {})
             if issue:
-                log(f"Created Linear ticket: {issue.get('identifier')} - {issue.get('url')}")
+                state = (issue.get("state") or {}).get("name", "?")
+                assignee = (issue.get("assignee") or {}).get("name", "UNASSIGNED")
+                log(
+                    f"Created Linear ticket: {issue.get('identifier')} "
+                    f"[{state}, assigned to {assignee}] - {issue.get('url')}"
+                )
                 return issue
             log(f"Linear API returned no issue: {data}")
             return None
