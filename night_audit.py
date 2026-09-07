@@ -29,6 +29,31 @@ from alert_opera_down import (
 # Catch-up safety limits
 MAX_CATCHUP_ITERATIONS = 10  # safety bound; won't ever roll more than 10 days in one run
 
+# A night audit always advances the business date by exactly one day. Any other
+# gap means we misread the dialog, not that OPERA is doing something exotic.
+EXPECTED_ROLL_DAYS = 1
+
+# Long-edge cap for screenshots sent purely to READ text (dates in dialogs).
+# opera_auto sends a fixed 1280x800 because it scales click coordinates back
+# from that space - do not reuse this there. Here nothing is clicked, so we
+# preserve the aspect ratio and send more pixels, which makes OPERA's small
+# dialog text far less likely to be misread (6 vs 8 vs 9).
+OCR_MAX_EDGE = 1568
+
+
+def ocr_screenshot_b64():
+    """Screenshot for text reading only. Aspect-preserving, higher resolution
+    than the click path. Never derive click coordinates from this image."""
+    adapter = LocalAdapter()
+    obs = adapter.observe()
+    img = Image.open(io.BytesIO(obs.screenshot))
+    # Pillow renamed/removed some resampling aliases in 10.0; LANCZOS survived,
+    # but fall back rather than crash an unattended 2am run on an odd version.
+    img.thumbnail((OCR_MAX_EDGE, OCR_MAX_EDGE), getattr(Image, "LANCZOS", Image.BICUBIC))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
 
 def audit_log(msg):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -169,13 +194,7 @@ def run_audit_iteration(iteration_label):
     for date_attempt in range(3):
         try:
             time.sleep(3)
-            adapter = LocalAdapter()
-            obs = adapter.observe()
-            img = Image.open(io.BytesIO(obs.screenshot))
-            resized = img.resize((1280, 800))
-            buf = io.BytesIO()
-            resized.save(buf, format="PNG")
-            img_b64 = base64.b64encode(buf.getvalue()).decode()
+            img_b64 = ocr_screenshot_b64()
 
             client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
             resp = client.messages.create(
@@ -200,6 +219,21 @@ def run_audit_iteration(iteration_label):
                 roll_to_parsed = datetime(2000 + int(to_parts[2]), int(to_parts[0]), int(to_parts[1])).date()
                 today = datetime.now().date()
                 audit_log(f"  System date: {today.strftime('%m-%d-%y')}, From: {roll_from.strftime('%m-%d-%y')}, To: {roll_to_parsed.strftime('%m-%d-%y')}")
+
+                # A misread digit (6 read as 9) produces a plausible-looking but
+                # wrong TO date, which used to surface as a bogus "refusing to roll
+                # past real calendar time" abort. The roll is always exactly one
+                # day, so anything else means the OCR is wrong - retry the read
+                # rather than acting on it or alerting on it.
+                gap_days = (roll_to_parsed - roll_from).days
+                if gap_days != EXPECTED_ROLL_DAYS:
+                    audit_log(
+                        f"  Misread: dialog parsed as {roll_from.strftime('%m-%d-%y')} -> "
+                        f"{roll_to_parsed.strftime('%m-%d-%y')} ({gap_days} days). "
+                        f"A night audit always rolls exactly {EXPECTED_ROLL_DAYS} day. "
+                        f"Re-reading (attempt {date_attempt+1}/3)..."
+                    )
+                    continue
 
                 if roll_from >= today:
                     reason = (f"OPERA business date ({roll_from.strftime('%m-%d-%y')}) is already "
@@ -258,7 +292,18 @@ def run_audit_iteration(iteration_label):
             audit_log(f"  Date check attempt {date_attempt+1} errored: {e}")
 
     if not dates_captured:
-        audit_log("  Could not capture dates after 3 attempts - proceeding without safety check")
+        # Previously this proceeded and clicked Yes without ever having read the
+        # dialog, which can roll the business date past real calendar time - the
+        # exact outcome the safety check exists to prevent. Failing the run is
+        # recoverable (run it again); a wrongly rolled business date is not.
+        reason = (
+            "Could not read the roll-date dialog after 3 attempts, so the roll-to "
+            "date was never verified. Refusing to confirm the roll blind. "
+            "Check the OPERA screen state on this machine and re-run."
+        )
+        do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
+        time.sleep(3)
+        fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
 
     # Click Yes (if dialog still visible) and verify EOD Routine screen
     if not do_until("Click the Yes button to confirm moving the business date. If you see the End of Day Routine screen already, no action needed.",
