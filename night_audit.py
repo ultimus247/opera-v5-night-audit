@@ -6,6 +6,7 @@ To update this script, run `git pull` in C:\\scripts\\automations.
 """
 import os
 import sys
+import base64
 import subprocess
 
 # Load config BEFORE importing opera_auto so ANTHROPIC_API_KEY is available
@@ -145,7 +146,7 @@ def run_audit_iteration(iteration_label):
         None if dates could not be parsed (audit may still have run).
     On failure, calls fail_and_exit (script terminates).
     """
-    import base64, re as _re
+    import re as _re
     from anthropic import Anthropic
     from datetime import datetime, timedelta
 
