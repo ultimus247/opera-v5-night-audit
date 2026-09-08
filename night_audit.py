@@ -42,6 +42,25 @@ EXPECTED_ROLL_DAYS = 1
 OCR_MAX_EDGE = 1568
 
 
+def roll_safety_reason(roll_from, roll_to, today):
+    """None if it is safe to roll the business date, else the abort reason.
+
+    Both Phase 4 paths must call this. They diverged once: the confirm-dialog
+    path checked these two conditions, the auto-dismissed-dialog path checked
+    nothing, and on 2026-09-08 it rolled the business date to 09-09-26 while
+    the real date was still 09-08-26. Skipping the dialog must not mean
+    skipping the safety checks.
+    """
+    if roll_from >= today:
+        return (f"OPERA business date ({roll_from.strftime('%m-%d-%y')}) is already "
+                f"equal to or ahead of the system date ({today.strftime('%m-%d-%y')}). "
+                f"Night audit appears to have already run today - refusing to roll forward.")
+    if roll_to > today:
+        return (f"Roll-to date ({roll_to.strftime('%m-%d-%y')}) is after the system date "
+                f"({today.strftime('%m-%d-%y')}). Refusing to roll past real calendar time.")
+    return None
+
+
 def ocr_screenshot_b64():
     """Screenshot for text reading only. Aspect-preserving, higher resolution
     than the click path. Never derive click coordinates from this image."""
@@ -236,17 +255,8 @@ def run_audit_iteration(iteration_label):
                     )
                     continue
 
-                if roll_from >= today:
-                    reason = (f"OPERA business date ({roll_from.strftime('%m-%d-%y')}) is already "
-                              f"equal to or ahead of the system date ({today.strftime('%m-%d-%y')}). "
-                              f"Night audit appears to have already run today - refusing to roll forward.")
-                    do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
-                    time.sleep(3)
-                    fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
-
-                if roll_to_parsed > today:
-                    reason = (f"Roll-to date ({roll_to_parsed.strftime('%m-%d-%y')}) is after the system date "
-                              f"({today.strftime('%m-%d-%y')}). Refusing to roll past real calendar time.")
+                reason = roll_safety_reason(roll_from, roll_to_parsed, today)
+                if reason:
                     do("Click the No button on the dialog asking about moving the business date. Do NOT click Yes.")
                     time.sleep(3)
                     fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
@@ -271,12 +281,31 @@ def run_audit_iteration(iteration_label):
                 )
                 title_date = resp2.content[0].text.strip()
                 title_dates = _re.findall(r"(\d{2})-(\d{2})-(\d{2})", title_date)
-                if title_dates:
-                    parts = title_dates[0]
-                    # The title bar shows the FROM date. Add 1 day for the TO date.
-                    title_from = datetime(2000 + int(parts[2]), int(parts[0]), int(parts[1])).date()
-                    roll_to = title_from + timedelta(days=1)
-                    audit_log(f"  Title bar shows {title_from.strftime('%m-%d-%y')} (FROM); rolling to {roll_to.strftime('%m-%d-%y')} (TO)")
+                if not title_dates:
+                    # Previously this fell through with dates_captured = True and
+                    # roll_to = None, i.e. ran the routine without ever knowing the
+                    # business date. Retry instead; if all 3 reads fail, the
+                    # dates_captured guard below declines the roll.
+                    audit_log(f"  Could not read the business date from the title bar "
+                              f"(got {title_date!r}). Re-reading (attempt {date_attempt+1}/3)...")
+                    continue
+
+                parts = title_dates[0]
+                # The title bar shows the FROM date. Add 1 day for the TO date.
+                title_from = datetime(2000 + int(parts[2]), int(parts[0]), int(parts[1])).date()
+                roll_to_candidate = title_from + timedelta(days=1)
+                today = datetime.now().date()
+                audit_log(f"  Title bar shows {title_from.strftime('%m-%d-%y')} (FROM); "
+                          f"rolling to {roll_to_candidate.strftime('%m-%d-%y')} (TO)")
+
+                # Same guards as the confirm-dialog path above.
+                reason = roll_safety_reason(title_from, roll_to_candidate, today)
+                if reason:
+                    # The dialog is already gone, so there is nothing to decline -
+                    # just stop before Phase 5 clicks Start and runs the roll.
+                    fail_and_exit(alert_night_audit_not_run, "Phase 4: Confirm Roll Business Date", reason)
+
+                roll_to = roll_to_candidate
                 dates_captured = True
                 break
 
